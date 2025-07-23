@@ -1,0 +1,120 @@
+const { nanoid } = require('nanoid');
+const { Pool } = require('pg');
+const AuthorizationError = require('../../exceptions/authorizationError');
+const InvariantError = require('../../exceptions/invariantError');
+const NotFoundError = require('../../exceptions/notFoundError');
+
+class PlaylistsService {
+  constructor(collaborationsService, cacheService) {
+    this._pool = new Pool();
+    this._collaborationsService = collaborationsService;
+    this._cacheService = cacheService;
+  }
+
+  async addPlaylist({ name, owner }) {
+    const id = `playlist-${nanoid(16)}`;
+    const query = {
+      text: 'INSERT INTO playlists VALUES($1, $2, $3) RETURNING id',
+      values: [id, name, owner],
+    };
+
+    const result = await this._pool.query(query);
+    if (!result.rowCount) {
+      throw new InvariantError('Playlist gagal ditambahkan');
+    }
+
+    await this._cacheService.delete(`playlists:${owner}`);
+    return result.rows[0].id;
+  }
+
+  async getPlaylists(userId) {
+    try {
+      const cached = await this._cacheService.get(`playlists:${userId}`);
+      return JSON.parse(cached);
+    } catch {
+      const query = {
+        text: `
+          SELECT playlists.id, playlists.name, users.username
+          FROM playlists
+          JOIN users ON playlists.owner = users.id
+          LEFT JOIN collaborations ON collaborations.playlist_id = playlists.id
+          WHERE playlists.owner = $1 OR collaborations.user_id = $1
+        `,
+        values: [userId],
+      };
+
+      const result = await this._pool.query(query);
+      await this._cacheService.set(`playlists:${userId}`, JSON.stringify(result.rows));
+      return result.rows;
+    }
+  }
+
+  async deletePlaylistById(playlistId, userId) {
+    await this.verifyPlaylistOwner(playlistId, userId);
+
+    const query = {
+      text: 'DELETE FROM playlists WHERE id = $1 RETURNING id',
+      values: [playlistId],
+    };
+
+    const result = await this._pool.query(query);
+    if (!result.rowCount) {
+      throw new NotFoundError('Playlist gagal dihapus. Id tidak ditemukan');
+    }
+
+    await this._cacheService.delete(`playlists:${userId}`);
+  }
+
+  async getPlaylistById(id) {
+    const query = {
+      text: 'SELECT * FROM playlists WHERE id = $1',
+      values: [id],
+    };
+
+    const result = await this._pool.query(query);
+    if (!result.rowCount) {
+      throw new NotFoundError('Playlist tidak ditemukan');
+    }
+
+    return result.rows[0];
+  }
+
+  async verifyPlaylistOwner(id, userId) {
+    const query = {
+      text: 'SELECT owner FROM playlists WHERE id = $1',
+      values: [id],
+    };
+
+    const result = await this._pool.query(query);
+    if (!result.rowCount) {
+      throw new NotFoundError('Playlist tidak ditemukan');
+    }
+
+    if (result.rows[0].owner !== userId) {
+      throw new AuthorizationError('Anda tidak berhak mengakses resource ini');
+    }
+  }
+
+  async verifyPlaylistIsExist(id) {
+    const query = {
+      text: 'SELECT id FROM playlists WHERE id = $1',
+      values: [id],
+    };
+
+    const result = await this._pool.query(query);
+    if (!result.rowCount) {
+      throw new NotFoundError('Playlist tidak ditemukan');
+    }
+  }
+
+  async verifyPlaylistAccess(playlistId, userId) {
+    try {
+      await this.verifyPlaylistOwner(playlistId, userId);
+    } catch (err) {
+      if (err instanceof NotFoundError) throw err;
+      await this._collaborationsService.verifyCollaborator(playlistId, userId);
+    }
+  }
+}
+
+module.exports = PlaylistsService;

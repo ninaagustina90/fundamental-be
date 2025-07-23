@@ -1,0 +1,23 @@
+{
+  "name": "openmusic-queue-consumer",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "eslint": "^9.31.0"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.8",
+    "auto-bind": "^5.0.1",
+    "dotenv": "^17.2.0",
+    "nodemailer": "^7.0.5",
+    "pg": "^8.16.3"
+  }
+}
