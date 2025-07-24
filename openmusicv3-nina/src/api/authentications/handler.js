@@ -1,4 +1,4 @@
-const autoBind = require('auto-bind').default; // Perbaikan penting
+const autoBind = require('auto-bind').default;
 
 class AuthenticationsHandler {
   constructor(authenticationsService, usersService, tokenManager, validator) {
@@ -7,70 +7,62 @@ class AuthenticationsHandler {
     this._tokenManager = tokenManager;
     this._validator = validator;
 
-    autoBind(this); // agar semua handler tetap bound ke instance
+    autoBind(this);
   }
 
   async postAuthenticationHandler(request, h) {
-    try {
-      this._validator.validatePostAuthenticationPayload(request.payload);
+    this._validator.validatePostAuthenticationPayload(request.payload);
 
-      const { username, password } = request.payload;
-      const userId = await this._usersService.verifyUserCredential(username, password);
+    const { username, password } = request.payload;
+    const id = await this._usersService.verifyUserCredential(username, password);
 
-      const accessToken = this._tokenManager.generateAccessToken({ id: userId });
-      const refreshToken = this._tokenManager.generateRefreshToken({ id: userId });
+    const accessToken = this._tokenManager.generateAccessToken({ id });
+    const refreshToken = this._tokenManager.generateRefreshToken({ id });
 
-      await this._authenticationsService.addRefreshToken(refreshToken);
+    await this._authenticationsService.addRefreshToken(refreshToken);
 
-      return h.response({
-        status: 'success',
-        message: 'Authentication berhasil ditambahkan',
-        data: { accessToken, refreshToken },
-      }).code(201);
-    } catch (error) {
-      console.error('postAuthenticationHandler error:', error);
-      throw error;
-    }
+    const response = h.response({
+      status: 'success',
+      message: 'Authentication berhasil ditambahkan',
+      data: {
+        accessToken,
+        refreshToken,
+      },
+    });
+    response.code(201);
+
+    return response;
   }
 
-  async putAuthenticationHandler(request, h) {
-    try {
-      this._validator.validatePutAuthenticationPayload(request.payload);
+  async putAuthenticationHandler(request) {
+    this._validator.validatePutAuthenticationPayload(request.payload);
 
-      const { refreshToken } = request.payload;
-      await this._authenticationsService.verifyRefreshToken(refreshToken);
-      const { id } = this._tokenManager.verifyRefreshToken(refreshToken);
+    const { refreshToken } = request.payload;
+    await this._authenticationsService.verifyRefreshToken(refreshToken);
+    const { id } = this._tokenManager.verifyRefreshToken(refreshToken);
 
-      const accessToken = this._tokenManager.generateAccessToken({ id });
+    const accessToken = this._tokenManager.generateAccessToken({ id });
 
-      return h.response({
-        status: 'success',
-        message: 'Access token berhasil diperbarui',
-        data: { accessToken },
-      }).code(200);
-    } catch (error) {
-      console.error('putAuthenticationHandler error:', error);
-      throw error;
-    }
+    return {
+      status: 'success',
+      message: 'Access Token berhasil diperbarui',
+      data: {
+        accessToken,
+      },
+    };
   }
 
-  async deleteAuthenticationHandler(request, h) {
-    try {
-      this._validator.validateDeleteAuthenticationPayload(request.payload);
+  async deleteAuthenticationHandler(request) {
+    this._validator.validateDeleteAuthenticationPayload(request.payload);
 
-      const { refreshToken } = request.payload;
+    const { refreshToken } = request.payload;
+    await this._authenticationsService.verifyRefreshToken(refreshToken);
+    await this._authenticationsService.deleteRefreshToken(refreshToken);
 
-      await this._authenticationsService.verifyRefreshToken(refreshToken);
-      await this._authenticationsService.deleteRefreshToken(refreshToken);
-
-      return h.response({
-        status: 'success',
-        message: 'Refresh token berhasil dihapus',
-      }).code(200);
-    } catch (error) {
-      console.error('deleteAuthenticationHandler error:', error);
-      throw error;
-    }
+    return {
+      status: 'success',
+      message: 'Refresh token berhasil dihapus',
+    };
   }
 }
 

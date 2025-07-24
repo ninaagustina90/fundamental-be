@@ -30,6 +30,7 @@
     "auto-bind": "^5.0.1",
     "bcrypt": "^6.0.0",
     "dotenv": "^17.2.0",
+    "joi": "^17.13.3",
     "nanoid": "^3.3.11",
     "node-pg-migrate": "^8.0.3",
     "redis": "^5.6.0"

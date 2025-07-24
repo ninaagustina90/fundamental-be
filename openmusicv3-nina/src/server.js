@@ -80,7 +80,8 @@ const init = async () => {
     {
       plugin: albums,
       options: {
-        service: albumsService,
+        albumsService: albumsService,
+        songsService: songsService,
         validator: AlbumsValidator,
       },
     },
@@ -144,6 +145,8 @@ const init = async () => {
   server.ext('onPreResponse', (request, h) => {
     const { response } = request;
 
+    
+
     if (response instanceof ClientError) {
       const clientErrorResponse = h.response({
         status: 'fail',
@@ -170,3 +173,4 @@ const init = async () => {
 };
 
 init();
+

@@ -3,52 +3,34 @@ const redis = require('redis');
 class CacheService {
   constructor() {
     this._client = redis.createClient({
-      host: process.env.REDIS_SERVER,
+      url: `redis://${process.env.REDIS_SERVER}`,
     });
 
     this._client.on('error', (error) => {
       throw error;
     });
+
+    this._client.connect().catch((err) => {
+      console.error('Redis connection error:', err);
+    });
   }
 
   set(key, value, expirationInSecond = 3600) {
-    return new Promise((resolve, reject) => {
-      this._client.set(key, value, 'EX', expirationInSecond, (error, ok) => {
-        if (error) {
-          return reject(error);
-        }
-
-        return resolve(ok);
-      });
+    return this._client.set(key, value, {
+      EX: expirationInSecond,
     });
   }
 
-  get(key) {
-    return new Promise((resolve, reject) => {
-      this._client.get(key, (error, reply) => {
-        if (error) {
-          return reject(error);
-        }
-
-        if (reply === null) {
-          return reject(new Error('Cache tidak ditemukan'));
-        }
-
-        return resolve(reply.toString());
-      });
-    });
+  async get(key) {
+    const result = await this._client.get(key);
+    if (result === null) {
+      throw new Error('Cache tidak ditemukan');
+    }
+    return result.toString();
   }
 
   delete(key) {
-    return new Promise((resolve, reject) => {
-      this._client.del(key, (error, count) => {
-        if (error) {
-          return reject(error);
-        }
-
-        return resolve(count);
-      });
-    });
+    return this._client.del(key);
   }
 }
 
