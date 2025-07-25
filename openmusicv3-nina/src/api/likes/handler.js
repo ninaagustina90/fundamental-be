@@ -1,11 +1,11 @@
-const autoBind = require('auto-bind').default; // ⛑️ penting untuk akses fungsi default
+const autoBind = require('auto-bind').default; 
 
 class LikesHandler {
   constructor(likesService, albumsService) {
     this._service = likesService;
     this._albumsService = albumsService;
 
-    autoBind(this); // 🛡️ pastikan semua method terikat ke this
+    autoBind(this); 
   }
 
   async postLikeAlbumHandler(request, h) {

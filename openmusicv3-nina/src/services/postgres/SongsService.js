@@ -1,5 +1,5 @@
-const { Pool } = require('pg');
 const { nanoid } = require('nanoid');
+const { Pool } = require('pg');
 const InvariantError = require('../../exceptions/invariantError');
 const NotFoundError = require('../../exceptions/notFoundError');
 const { mapSongsDBToModel } = require('../../utils');
@@ -10,125 +10,107 @@ class SongsService {
     this._cacheService = cacheService;
   }
 
-  async addSong({ title, year, genre, performer, duration, albumId }) {
+  async addSong({ title, year, performer, genre, duration }) {
     const id = `song-${nanoid(16)}`;
-    const timestamp = new Date().toISOString();
+    const insertedAt = new Date().toISOString();
 
     const query = {
-      text: `
-        INSERT INTO songs (id, title, year, genre, performer, duration, album_id, inserted_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
-        RETURNING id
-      `,
+      text: 'INSERT INTO songs VALUES($1, $2, $3, $4, $5, $6, $7, $7) RETURNING id',
       values: [
         id,
         title,
         Number(year),
-        genre,
         performer,
+        genre,
         Number(duration),
-        albumId,
-        timestamp,
+        insertedAt,
       ],
     };
 
     const result = await this._pool.query(query);
+
     if (!result.rowCount) {
       throw new InvariantError('Lagu gagal ditambahkan');
     }
 
+    // agar cache yang disimpan dihapus ketika terjadi perubahan data
     await this._cacheService.delete('songs');
+
     return result.rows[0].id;
   }
 
-  async getSongs(title = '', performer = '') {
+  async getSongs() {
     try {
-      const cached = await this._cacheService.get('songs');
-      return JSON.parse(cached);
-    } catch {
-      const query = {
-        text: `
-          SELECT id, title, performer
-          FROM songs
-          WHERE title ILIKE $1 OR performer ILIKE $2
-        `,
-        values: [`%${title}%`, `%${performer}%`],
-      };
+      // get songs cache first
+      const result = await this._cacheService.get('songs');
+      return JSON.parse(result);
+    } catch (err) {
+      // if fails, continue get from database database
+      const result = await this._pool.query(
+        'SELECT id, title, performer FROM songs',
+      );
 
-      const result = await this._pool.query(query);
-      const mapped = result.rows.map(mapSongsDBToModel);
-      await this._cacheService.set('songs', JSON.stringify(mapped));
-      return mapped;
+      const mappedSongs = result.rows.map(mapSongsDBToModel);
+
+      // save songs to cache
+      await this._cacheService.set('songs', JSON.stringify(mappedSongs));
+
+      return mappedSongs;
     }
-  }
-
-  async getSongsByAlbumId(albumId) {
-    const query = {
-      text: 'SELECT * FROM songs WHERE album_id = $1',
-      values: [albumId],
-    };
-
-    const result = await this._pool.query(query);
-
-    
-    if (result.rows.length > 0) {
-  
-} else {
-  return []
-}
-
-
-    return result.rows.map(mapSongsDBToModel);
   }
 
   async getSongById(songId) {
     try {
-      const cached = await this._cacheService.get(`songs:${songId}`);
-      return JSON.parse(cached);
-    } catch {
+      // get song cache first
+      const result = await this._cacheService.get(`songs:${songId}`);
+      return JSON.parse(result);
+    } catch (err) {
       const query = {
         text: 'SELECT * FROM songs WHERE id = $1',
         values: [songId],
       };
 
       const result = await this._pool.query(query);
+
       if (!result.rowCount) {
         throw new NotFoundError('Lagu tidak ditemukan');
       }
 
-      const mapped = mapSongsDBToModel(result.rows[0]);
-      await this._cacheService.set(`songs:${songId}`, JSON.stringify(mapped));
-      return mapped;
+      const mappedSongs = result.rows.map(mapSongsDBToModel)[0];
+
+      // save song to cache
+      await this._cacheService.set(
+        `songs:${songId}`,
+        JSON.stringify(mappedSongs),
+      );
+
+      return mappedSongs;
     }
   }
 
-  async editSongById(songId, { title, year, genre, performer, duration, albumId }) {
+  async editSongById(songId, { title, year, performer, genre, duration }) {
     const updatedAt = new Date().toISOString();
 
     const query = {
-      text: `
-        UPDATE songs
-        SET title = $1, year = $2, genre = $3, performer = $4, duration = $5, album_id = $6, updated_at = $7
-        WHERE id = $8
-        RETURNING id
-      `,
+      text: 'UPDATE songs SET title = $1, year = $2, performer = $3, genre = $4, duration = $5, updated_at = $6 WHERE id = $7 RETURNING id',
       values: [
         title,
         Number(year),
-        genre,
         performer,
+        genre,
         Number(duration),
-        albumId,
         updatedAt,
         songId,
       ],
     };
 
     const result = await this._pool.query(query);
+
     if (!result.rowCount) {
       throw new NotFoundError('Gagal memperbarui lagu. Id tidak ditemukan');
     }
 
+    // agar cache yang disimpan dihapus ketika terjadi perubahan data
     await this._cacheService.delete('songs');
     await this._cacheService.delete(`songs:${songId}`);
   }
@@ -140,21 +122,24 @@ class SongsService {
     };
 
     const result = await this._pool.query(query);
+
     if (!result.rowCount) {
       throw new NotFoundError('Lagu gagal dihapus. Id tidak ditemukan');
     }
 
+    // agar cache yang disimpan dihapus ketika terjadi perubahan data
     await this._cacheService.delete('songs');
     await this._cacheService.delete(`songs:${songId}`);
   }
 
   async verifySongIsExist(id) {
     const query = {
-      text: 'SELECT id FROM songs WHERE id = $1',
+      text: 'SELECT * FROM songs WHERE id = $1',
       values: [id],
     };
 
     const result = await this._pool.query(query);
+
     if (!result.rowCount) {
       throw new NotFoundError('Lagu tidak ditemukan');
     }

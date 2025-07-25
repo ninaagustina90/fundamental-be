@@ -6,7 +6,9 @@ const path = require('path');
 const ClientError = require('./exceptions/clientError');
 
 // Services
+const likes = require('./api/likes');
 const CacheService = require('./services/redis/cacheService');
+const AlbumsLikeService = require('./services/postgres/AlbumsLikeService');
 const AlbumsService = require('./services/postgres/AlbumsService');
 const SongsService = require('./services/postgres/SongsService');
 const UsersService = require('./services/postgres/UsersService');
@@ -48,7 +50,7 @@ const init = async () => {
   const playlistSongsService = new PlaylistSongsServiceClass(playlistsService, cacheService);
   const collaborationsService = new CollaborationsServiceClass(cacheService);
   const storageService = new StorageService(path.resolve(__dirname, 'api/uploads/file/images'));
-
+  const albumLikesService = new AlbumsLikeService(cacheService);
   const server = Hapi.server({
     port: process.env.PORT,
     host: process.env.HOST,
@@ -140,12 +142,19 @@ const init = async () => {
         validator: UploadsValidator,
       },
     },
+    {
+      plugin: likes,
+      options: {
+        service: albumLikesService,
+        albumsService,
+      },
+    }
   ]);
 
   server.ext('onPreResponse', (request, h) => {
     const { response } = request;
 
-    
+
 
     if (response instanceof ClientError) {
       const clientErrorResponse = h.response({
