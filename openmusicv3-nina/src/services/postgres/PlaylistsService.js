@@ -11,6 +11,7 @@ class PlaylistsService {
     this._cacheService = cacheService;
   }
 
+  // 📥 Tambah playlist baru
   async addPlaylist({ name, owner }) {
     const id = `playlist-${nanoid(16)}`;
     const query = {
@@ -19,14 +20,13 @@ class PlaylistsService {
     };
 
     const result = await this._pool.query(query);
-    if (!result.rowCount) {
-      throw new InvariantError('Playlist gagal ditambahkan');
-    }
+    if (!result.rowCount) throw new InvariantError('Playlist gagal ditambahkan');
 
     await this._cacheService.delete(`playlists:${owner}`);
     return result.rows[0].id;
   }
 
+  // 📃 Ambil semua playlist yang dimiliki dan dibagikan melalui kolaborasi
   async getPlaylists(userId) {
     try {
       const cached = await this._cacheService.get(`playlists:${userId}`);
@@ -49,6 +49,23 @@ class PlaylistsService {
     }
   }
 
+  // 👤 Ambil playlist milik user (non-kolaboratif)
+  async getPlaylistsByUserId(userId) {
+    const query = {
+      text: `
+        SELECT playlists.id, playlists.name, users.username
+        FROM playlists
+        LEFT JOIN users ON playlists.owner = users.id
+        WHERE playlists.owner = $1
+      `,
+      values: [userId],
+    };
+
+    const result = await this._pool.query(query);
+    return result.rows;
+  }
+
+  // 🗑️ Hapus playlist (verifikasi kepemilikan terlebih dahulu)
   async deletePlaylistById(playlistId, userId) {
     await this.verifyPlaylistOwner(playlistId, userId);
 
@@ -58,13 +75,12 @@ class PlaylistsService {
     };
 
     const result = await this._pool.query(query);
-    if (!result.rowCount) {
-      throw new NotFoundError('Playlist gagal dihapus. Id tidak ditemukan');
-    }
+    if (!result.rowCount) throw new NotFoundError('Playlist gagal dihapus. ID tidak ditemukan');
 
     await this._cacheService.delete(`playlists:${userId}`);
   }
 
+  // 🔎 Ambil detail satu playlist berdasarkan ID
   async getPlaylistById(id) {
     const query = {
       text: 'SELECT * FROM playlists WHERE id = $1',
@@ -72,46 +88,43 @@ class PlaylistsService {
     };
 
     const result = await this._pool.query(query);
-    if (!result.rowCount) {
-      throw new NotFoundError('Playlist tidak ditemukan');
-    }
+    if (!result.rowCount) throw new NotFoundError('Playlist tidak ditemukan');
 
     return result.rows[0];
   }
 
-  async verifyPlaylistOwner(id, userId) {
+  // 🛡️ Verifikasi user adalah pemilik playlist
+  async verifyPlaylistOwner(playlistId, userId) {
     const query = {
       text: 'SELECT owner FROM playlists WHERE id = $1',
-      values: [id],
+      values: [playlistId],
     };
 
     const result = await this._pool.query(query);
-    if (!result.rowCount) {
-      throw new NotFoundError('Playlist tidak ditemukan');
-    }
+    if (!result.rowCount) throw new NotFoundError('Playlist tidak ditemukan');
 
     if (result.rows[0].owner !== userId) {
       throw new AuthorizationError('Anda tidak berhak mengakses resource ini');
     }
   }
 
-  async verifyPlaylistIsExist(id) {
+  // 📌 Cek keberadaan playlist berdasarkan ID
+  async verifyPlaylistIsExist(playlistId) {
     const query = {
       text: 'SELECT id FROM playlists WHERE id = $1',
-      values: [id],
+      values: [playlistId],
     };
 
     const result = await this._pool.query(query);
-    if (!result.rowCount) {
-      throw new NotFoundError('Playlist tidak ditemukan');
-    }
+    if (!result.rowCount) throw new NotFoundError('Playlist tidak ditemukan');
   }
 
+  // 🔒 Verifikasi akses terhadap playlist (owner atau kolaborator)
   async verifyPlaylistAccess(playlistId, userId) {
     try {
       await this.verifyPlaylistOwner(playlistId, userId);
-    } catch (err) {
-      if (err instanceof NotFoundError) throw err;
+    } catch (error) {
+      if (error instanceof NotFoundError) throw error;
       await this._collaborationsService.verifyCollaborator(playlistId, userId);
     }
   }

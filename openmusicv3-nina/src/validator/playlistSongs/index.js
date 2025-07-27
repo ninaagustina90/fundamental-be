@@ -1,28 +1,19 @@
 const InvariantError = require('../../exceptions/invariantError');
 const {
-  PostPlaylistPayloadSchema,
   PostSongToPlaylistPayloadSchema,
   DeleteSongFromPlaylistPayloadSchema,
 } = require('./schema');
 
-const PlaylistsValidator = {
-  // ✅ Validasi pembuatan playlist dengan pesan error yang informatif
-  validatePostPlaylistPayload(payload) {
-    const { error } = PostPlaylistPayloadSchema.validate(payload);
-    if (error) throw new InvariantError(error.message);
-  },
-
-  // ✅ Validasi penambahan lagu ke playlist
+const PlaylistSongsValidator = {
   validatePostSongToPlaylistPayload(payload) {
     const { error } = PostSongToPlaylistPayloadSchema.validate(payload);
     if (error) throw new InvariantError(error.message);
   },
 
-  // ✅ Validasi penghapusan lagu dari playlist
   validateDeleteSongFromPlaylistPayload(payload) {
     const { error } = DeleteSongFromPlaylistPayloadSchema.validate(payload);
     if (error) throw new InvariantError(error.message);
   },
 };
 
-module.exports = PlaylistsValidator;
+module.exports = PlaylistSongsValidator;

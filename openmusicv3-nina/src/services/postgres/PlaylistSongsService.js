@@ -10,14 +10,14 @@ class PlaylistSongsService {
     this._cacheService = cacheService;
   }
 
+  // 🎶 Tambahkan lagu ke playlist (verifikasi dulu akses dan keberadaan playlist)
   async addSongToPlaylist({ playlistId, userId, songId }) {
-    // Verifikasi playlist dan akses
     await this._playlistsService.verifyPlaylistIsExist(playlistId);
     await this._playlistsService.verifyPlaylistAccess(playlistId, userId);
 
     const id = `playlistsong-${nanoid(16)}`;
     const query = {
-      text: 'INSERT INTO playlistsongs VALUES ($1, $2, $3) RETURNING id',
+      text: 'INSERT INTO playlistsongs (id, playlist_id, song_id) VALUES ($1, $2, $3) RETURNING id',
       values: [id, playlistId, songId],
     };
 
@@ -30,31 +30,27 @@ class PlaylistSongsService {
     return result.rows[0].id;
   }
 
+  // 📃 Ambil daftar lagu dari playlist (dengan cache dan verifikasi akses)
   async getSongsFromPlaylist(playlistId, userId) {
-    try {
-      await this._playlistsService.verifyPlaylistAccess(playlistId, userId);
+    await this._playlistsService.verifyPlaylistAccess(playlistId, userId);
 
+    try {
       const cached = await this._cacheService.get(`playlistsongs:${playlistId}`);
       return JSON.parse(cached);
-    } catch (err) {
-      if (err instanceof AuthorizationError) {
-        throw new AuthorizationError('Anda tidak berhak mengakses resource ini');
-      }
-
+    } catch {
       const query = {
         text: `
           SELECT songs.id, songs.title, songs.performer
-          FROM playlists
-          INNER JOIN playlistsongs ON playlistsongs.playlist_id = playlists.id
+          FROM playlistsongs
           INNER JOIN songs ON songs.id = playlistsongs.song_id
-          WHERE playlists.id = $1
+          WHERE playlistsongs.playlist_id = $1
         `,
         values: [playlistId],
       };
 
       const result = await this._pool.query(query);
       if (!result.rowCount) {
-        throw new InvariantError('Lagu dari playlist tidak ditemukan');
+        throw new InvariantError('Playlist tidak memiliki lagu');
       }
 
       await this._cacheService.set(`playlistsongs:${playlistId}`, JSON.stringify(result.rows));
@@ -62,6 +58,7 @@ class PlaylistSongsService {
     }
   }
 
+  // ❌ Hapus lagu dari playlist (verifikasi dulu akses dan eksistensi playlist)
   async deleteSongFromPlaylist(playlistId, songId, userId) {
     await this._playlistsService.verifyPlaylistIsExist(playlistId);
     await this._playlistsService.verifyPlaylistAccess(playlistId, userId);
