@@ -10,27 +10,28 @@ class PlaylistSongsService {
     this._cacheService = cacheService;
   }
 
-  // 🎶 Tambahkan lagu ke playlist (verifikasi dulu akses dan keberadaan playlist)
+  // 🎶 Tambah lagu ke playlist
   async addSongToPlaylist({ playlistId, userId, songId }) {
     await this._playlistsService.verifyPlaylistIsExist(playlistId);
     await this._playlistsService.verifyPlaylistAccess(playlistId, userId);
 
     const id = `playlistsong-${nanoid(16)}`;
     const query = {
-      text: 'INSERT INTO playlistsongs (id, playlist_id, song_id) VALUES ($1, $2, $3) RETURNING id',
+      text: `INSERT INTO playlist_songs (id, playlist_id, song_id)
+             VALUES ($1, $2, $3) ON CONFLICT (playlist_id, song_id) DO NOTHING RETURNING id`,
       values: [id, playlistId, songId],
     };
 
     const result = await this._pool.query(query);
     if (!result.rowCount) {
-      throw new InvariantError('Lagu gagal ditambahkan ke playlist');
+      throw new InvariantError('Lagu sudah ada di playlist atau gagal ditambahkan');
     }
 
     await this._cacheService.delete(`playlistsongs:${playlistId}`);
     return result.rows[0].id;
   }
 
-  // 📃 Ambil daftar lagu dari playlist (dengan cache dan verifikasi akses)
+  // 📃 Ambil daftar lagu dari playlist
   async getSongsFromPlaylist(playlistId, userId) {
     await this._playlistsService.verifyPlaylistAccess(playlistId, userId);
 
@@ -41,9 +42,9 @@ class PlaylistSongsService {
       const query = {
         text: `
           SELECT songs.id, songs.title, songs.performer
-          FROM playlistsongs
-          INNER JOIN songs ON songs.id = playlistsongs.song_id
-          WHERE playlistsongs.playlist_id = $1
+          FROM playlist_songs
+          INNER JOIN songs ON songs.id = playlist_songs.song_id
+          WHERE playlist_songs.playlist_id = $1
         `,
         values: [playlistId],
       };
@@ -58,13 +59,14 @@ class PlaylistSongsService {
     }
   }
 
-  // ❌ Hapus lagu dari playlist (verifikasi dulu akses dan eksistensi playlist)
+  // ❌ Hapus lagu dari playlist
   async deleteSongFromPlaylist(playlistId, songId, userId) {
     await this._playlistsService.verifyPlaylistIsExist(playlistId);
     await this._playlistsService.verifyPlaylistAccess(playlistId, userId);
 
     const query = {
-      text: 'DELETE FROM playlistsongs WHERE playlist_id = $1 AND song_id = $2 RETURNING id',
+      text: `DELETE FROM playlist_songs
+             WHERE playlist_id = $1 AND song_id = $2 RETURNING id`,
       values: [playlistId, songId],
     };
 

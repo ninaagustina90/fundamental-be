@@ -1,17 +1,17 @@
 require('dotenv').config();
+
 const Hapi = require('@hapi/hapi');
 const Jwt = require('@hapi/jwt');
 const Inert = require('@hapi/inert');
 const path = require('path');
 const ClientError = require('./exceptions/clientError');
 
-// 🔧 Plugins
+// 🔌 Plugin API
 const albums = require('./api/albums');
 const songs = require('./api/songs');
 const users = require('./api/users');
 const authentications = require('./api/authentications');
-const playlists = require('./api/playlists');
-const playlistSongs = require('./api/playlistSongs'); // 🆕
+const playlists = require('./api/playlists'); // ✅ sudah gabung playlistSongs
 const collaborations = require('./api/collaborations');
 const exportsApi = require('./api/exports');
 const uploads = require('./api/uploads');
@@ -36,24 +36,25 @@ const AlbumsValidator = require('./validator/albums');
 const SongsValidator = require('./validator/songs');
 const UsersValidator = require('./validator/users');
 const AuthenticationsValidator = require('./validator/authentications');
-const PlaylistsValidator = require('./validator/playlists');
-const PlaylistSongsValidator = require('./validator/playlistSongs'); // 🆕
+const PlaylistsValidator = require('./validator/playlists'); // ✅ final validator
 const CollaborationsValidator = require('./validator/collaborations');
 const ExportsValidator = require('./validator/exports');
 const UploadsValidator = require('./validator/uploads');
 
 const init = async () => {
+  // ⚙️ Inisialisasi services
   const cacheService = new CacheService();
+  const collaborationsService = new CollaborationsService(cacheService);
+  const playlistsService = new PlaylistsService(collaborationsService, cacheService);
+  const playlistSongsService = new PlaylistSongsService(playlistsService, cacheService);
   const albumsService = new AlbumsService(cacheService);
   const songsService = new SongsService(cacheService);
   const usersService = new UsersService();
   const authenticationsService = new AuthenticationsService();
-  const playlistsService = new PlaylistsService(cacheService);
-  const playlistSongsService = new PlaylistSongsService(playlistsService, cacheService);
-  const collaborationsService = new CollaborationsService(cacheService);
   const albumLikesService = new AlbumsLikeService(cacheService);
   const storageService = new StorageService(path.resolve(__dirname, 'api/uploads/file/images'));
 
+  // 🚀 Buat server Hapi
   const server = Hapi.server({
     port: process.env.PORT,
     host: process.env.HOST,
@@ -62,10 +63,8 @@ const init = async () => {
     },
   });
 
-  await server.register([
-    { plugin: Jwt },
-    { plugin: Inert },
-  ]);
+  // 🔐 Registrasi plugin autentikasi JWT
+  await server.register([{ plugin: Jwt }, { plugin: Inert }]);
 
   server.auth.strategy('openmusicapp_jwt', 'jwt', {
     keys: process.env.ACCESS_TOKEN_KEY,
@@ -81,6 +80,7 @@ const init = async () => {
     }),
   });
 
+  // 📦 Registrasi semua plugin endpoint
   await server.register([
     {
       plugin: albums,
@@ -123,15 +123,6 @@ const init = async () => {
       },
     },
     {
-      plugin: playlistSongs,
-      options: {
-        playlistSongsService,
-        playlistsService,
-        songsService,
-        validator: PlaylistSongsValidator, // 🎯 validator khusus lagu dalam playlist
-      },
-    },
-    {
       plugin: collaborations,
       options: {
         collaborationsService,
@@ -163,6 +154,7 @@ const init = async () => {
     },
   ]);
 
+  // ⚠️ Global error handler
   server.ext('onPreResponse', (request, h) => {
     const { response } = request;
 
@@ -174,6 +166,7 @@ const init = async () => {
     }
 
     if (response.isServer) {
+      console.error(response);
       return h.response({
         status: 'error',
         message: 'Maaf, terjadi kegagalan pada server kami.',
@@ -184,7 +177,7 @@ const init = async () => {
   });
 
   await server.start();
-  console.log(`🚀 Server berjalan pada ${server.info.uri}`);
+  console.log(`✅ Server berjalan pada ${server.info.uri}`);
 };
 
 init();

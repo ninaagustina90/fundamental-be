@@ -2,23 +2,24 @@ const amqp = require('amqplib');
 
 const ProducerService = {
   sendMessage: async (queue, message) => {
-    const connection = await amqp.connect(process.env.RABBITMQ_SERVER);
+    let connection;
+    try {
+      connection = await amqp.connect(process.env.RABBITMQ_SERVER);
+      const channel = await connection.createChannel();
 
-    // objek channel yg dgunakan untuk memanggil API dlam mengoperasikan transaksi protokol AMQP
-    const channel = await connection.createChannel();
+      await channel.assertQueue(queue, {
+        durable: true,
+      });
 
-    // membuat channel baru bila channel yang diperiksa tidak ada
-    await channel.assertQueue(queue, {
-      durable: true, // menjaga agar queue tetap tersedia ketika server message broker restart
-    });
+      channel.sendToQueue(queue, Buffer.from(message)); // kirim pesan
 
-    // kirim pesan dalam bentuk Buffer, message dalam bentuk string
-    await channel.sendToQueue(queue, Buffer.from(message));
-
-    // tutup koneksi setelah satu detik berlangsung dari pengiriman pesan
-    setTimeout(() => {
-      connection.close();
-    }, 1000);
+      // Opsional: tutup connection dengan delay
+      setTimeout(() => {
+        connection.close();
+      }, 1000);
+    } catch (error) {
+      console.error('❌ Gagal mengirim pesan ke RabbitMQ:', error.message);
+    }
   },
 };
 

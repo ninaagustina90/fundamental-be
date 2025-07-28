@@ -1,6 +1,5 @@
 const Joi = require('joi');
 
-// 🎵 Validasi payload pembuatan playlist dengan pesan error yang jelas
 const PostPlaylistPayloadSchema = Joi.object({
   name: Joi.string().required().messages({
     'string.base': 'Nama playlist harus berupa string',
@@ -8,7 +7,6 @@ const PostPlaylistPayloadSchema = Joi.object({
   }),
 });
 
-// 🎵 Validasi payload penambahan lagu ke playlist
 const PostSongToPlaylistPayloadSchema = Joi.object({
   songId: Joi.string().required().messages({
     'string.base': 'ID lagu harus berupa string',
@@ -16,7 +14,6 @@ const PostSongToPlaylistPayloadSchema = Joi.object({
   }),
 });
 
-// 🎵 Validasi payload penghapusan lagu dari playlist
 const DeleteSongFromPlaylistPayloadSchema = Joi.object({
   songId: Joi.string().required().messages({
     'string.base': 'ID lagu harus berupa string',

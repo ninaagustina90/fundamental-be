@@ -22,7 +22,13 @@ class PlaylistsService {
     const result = await this._pool.query(query);
     if (!result.rowCount) throw new InvariantError('Playlist gagal ditambahkan');
 
-    await this._cacheService.delete(`playlists:${owner}`);
+    // 🔧 Hindari error jika Redis tidak tersedia
+    try {
+      await this._cacheService.delete(`playlists:${owner}`);
+    } catch (error) {
+      console.warn('Gagal menghapus cache, tapi playlist tetap dibuat:', error.message);
+    }
+
     return result.rows[0].id;
   }
 
@@ -44,7 +50,12 @@ class PlaylistsService {
       };
 
       const result = await this._pool.query(query);
-      await this._cacheService.set(`playlists:${userId}`, JSON.stringify(result.rows));
+      try {
+        await this._cacheService.set(`playlists:${userId}`, JSON.stringify(result.rows));
+      } catch (error) {
+        console.warn('Gagal menyimpan cache playlist:', error.message);
+      }
+
       return result.rows;
     }
   }
@@ -77,7 +88,11 @@ class PlaylistsService {
     const result = await this._pool.query(query);
     if (!result.rowCount) throw new NotFoundError('Playlist gagal dihapus. ID tidak ditemukan');
 
-    await this._cacheService.delete(`playlists:${userId}`);
+    try {
+      await this._cacheService.delete(`playlists:${userId}`);
+    } catch (error) {
+      console.warn('Gagal menghapus cache setelah delete playlist:', error.message);
+    }
   }
 
   // 🔎 Ambil detail satu playlist berdasarkan ID

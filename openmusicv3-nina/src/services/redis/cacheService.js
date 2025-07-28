@@ -3,23 +3,33 @@ const redis = require('redis');
 class CacheService {
   constructor() {
     this._client = redis.createClient({
-      url: `redis://${process.env.REDIS_SERVER}`,
+      socket: {
+        host: process.env.REDIS_SERVER,
+        port: Number(process.env.REDIS_PORT), 
+      },
+    });
+
+    this._client.on('connect', () => {
+      console.log('✅ Redis connected on', process.env.REDIS_SERVER + ':' + process.env.REDIS_PORT);
     });
 
     this._client.on('error', (error) => {
-      throw error;
+      console.error('❌ Redis error:', error.message);
     });
 
     this._client.connect().catch((err) => {
-      console.error('Redis connection error:', err);
+      console.error('Redis connection error:', err.message);
     });
   }
 
-  set(key, value, expirationInSecond = 3600) {
+ 
+  set(key, value) {
+    const EXPIRATION = 1800; 
     return this._client.set(key, value, {
-      EX: expirationInSecond,
+      EX: EXPIRATION,
     });
   }
+
 
   async get(key) {
     const result = await this._client.get(key);
@@ -29,6 +39,7 @@ class CacheService {
     return result.toString();
   }
 
+ 
   delete(key) {
     return this._client.del(key);
   }

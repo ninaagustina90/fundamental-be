@@ -14,6 +14,7 @@ module.exports = {
       songsService,
       validator,
     );
+
     server.route(routes(playlistsHandler));
   },
 };
