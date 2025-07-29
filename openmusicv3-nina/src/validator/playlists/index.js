@@ -11,7 +11,7 @@ const PlaylistsValidator = {
     if (error) throw new InvariantError(error.message);
   },
 
-  validatePostSongToPlaylistPayload(payload) {
+  validatePlaylistSongPayload(payload) {
     const { error } = PostSongToPlaylistPayloadSchema.validate(payload);
     if (error) throw new InvariantError(error.message);
   },

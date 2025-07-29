@@ -14,7 +14,6 @@ class CollaborationsService {
 
   async addCollaboration(playlistId, userId) {
     const id = `collab-${nanoid(16)}`;
-
     const query = {
       text: `
         INSERT INTO collaborations (id, playlist_id, user_id)
@@ -26,17 +25,11 @@ class CollaborationsService {
     };
 
     const result = await this._pool.query(query);
-
     if (!result.rowCount) {
       throw new InvariantError('Kolaborasi sudah ada atau gagal ditambahkan');
     }
 
-    try {
-      await this._cacheService.delete(`playlists:${userId}`);
-    } catch (error) {
-      console.warn(`⚠️ Gagal menghapus cache untuk user ${userId}:`, error.message);
-    }
-
+    await this._deleteUserCache(userId);
     return result.rows[0].id;
   }
 
@@ -51,16 +44,11 @@ class CollaborationsService {
     };
 
     const result = await this._pool.query(query);
-
     if (!result.rowCount) {
       throw new InvariantError('Kolaborasi gagal dihapus. ID tidak ditemukan');
     }
 
-    try {
-      await this._cacheService.delete(`playlists:${userId}`);
-    } catch (error) {
-      console.warn(`⚠️ Gagal menghapus cache untuk user ${userId}:`, error.message);
-    }
+    await this._deleteUserCache(userId);
   }
 
   async verifyCollaborator(playlistId, userId) {
@@ -73,9 +61,16 @@ class CollaborationsService {
     };
 
     const result = await this._pool.query(query);
-
     if (!result.rowCount) {
       throw new InvariantError('Kolaborasi gagal diverifikasi');
+    }
+  }
+
+  async _deleteUserCache(userId) {
+    try {
+      await this._cacheService.delete(`playlists:${userId}`);
+    } catch (error) {
+      console.warn(`⚠️ Gagal menghapus cache untuk user ${userId}: ${error.message}`);
     }
   }
 }
