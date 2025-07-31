@@ -20,15 +20,6 @@ class PlaylistsService {
     };
 
     const result = await this._pool.query(query);
-    if (!result.rowCount) throw new InvariantError('Playlist gagal ditambahkan');
-
-    // 🔧 Hindari error jika Redis tidak tersedia
-    try {
-      await this._cacheService.delete(`playlists:${owner}`);
-    } catch (error) {
-      console.warn('Gagal menghapus cache, tapi playlist tetap dibuat:', error.message);
-    }
-
     return result.rows[0].id;
   }
 
@@ -111,25 +102,32 @@ class PlaylistsService {
   // 🛡️ Verifikasi user adalah pemilik playlist
   async verifyPlaylistOwner(playlistId, userId) {
     const query = {
-      text: 'SELECT owner FROM playlists WHERE id = $1',
-      values: [playlistId],
+        text: 'SELECT owner FROM playlists WHERE id = $1',
+        values: [playlistId],
     };
 
     const result = await this._pool.query(query);
-    if (!result.rowCount) throw new NotFoundError('Playlist tidak ditemukan');
-
-    if (result.rows[0].owner !== userId) {
-      throw new AuthorizationError('Anda tidak berhak mengakses resource ini');
+    
+    // Check if the playlist exists
+    if (!result.rowCount) {
+       throw new AuthorizationError('Anda tidak berhak mengakses resource ini'); // Throw an error if the playlist does not exist
     }
-  }
 
+    // Check if the user is the owner of the playlist
+    if (result.rows[0].owner !== userId) {
+        throw new AuthorizationError('Anda tidak berhak mengakses resource ini');
+    }
+}
+
+  
   // 📌 Cek keberadaan playlist berdasarkan ID
   async verifyPlaylistIsExist(playlistId) {
+    console.log(`Verifying existence of playlist with ID: ${playlistId}`);
     const query = {
       text: 'SELECT id FROM playlists WHERE id = $1',
       values: [playlistId],
     };
-
+    
     const result = await this._pool.query(query);
     if (!result.rowCount) throw new NotFoundError('Playlist tidak ditemukan');
   }

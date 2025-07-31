@@ -1,67 +1,64 @@
-const autoBind = require('auto-bind').default; 
+const autoBind = require('auto-bind').default;
 
 class LikesHandler {
-  constructor(likesService, albumsService) {
-    this._service = likesService;
+  constructor(service, albumsService) {
+    this._service = service;
     this._albumsService = albumsService;
 
-    autoBind(this); 
+    autoBind(this);
   }
 
   async postLikeAlbumHandler(request, h) {
     try {
-      const { id: credentialId } = request.auth.credentials;
+      const { id: userId } = request.auth.credentials;
       const { id: albumId } = request.params;
 
-      await this._albumsService.getAlbumById(albumId);
-      const message = await this._service.likedAlbums(credentialId, albumId);
+      await this._service.verifyUser(userId);  // Tambahan validasi user
+      await this._albumsService.verifyAlbumExist(albumId);
+      await this._service.likeAlbum(userId, albumId); // Pastikan user belum like album ini
+
+      const message = await this._service.likeAlbum(userId, albumId);
 
       return h.response({
         status: 'success',
         message,
       }).code(201);
     } catch (error) {
-      console.error('postLikeAlbumHandler error:', error);
+      console.error('postLikeAlbumHandler error:', error.message); // Aman & tidak mengungkap detail internal
       throw error;
     }
   }
 
   async getLikeAlbumHandler(request, h) {
-    try {
-      const { id: albumId } = request.params;
-      await this._albumsService.getAlbumById(albumId);
+   
+    const { id: albumId } = request.params;
 
-      const { cache, likes } = await this._service.getLikes(albumId);
+    const { likes, isCache } = await this._service.getAlbumLikes(albumId);
 
-      const response = h.response({
-        status: 'success',
-        data: { likes },
-      });
+    const response = h.response({
+      status: 'success',
+      data: {
+        likes,
+      },
+    });
 
-      if (cache) response.header('X-Data-Source', 'cache');
-      return response.code(200);
-    } catch (error) {
-      console.error('getLikeAlbumHandler error:', error);
-      throw error;
+    if (isCache) {
+      response.header('X-Data-Source', 'cache');
     }
+
+    return response;
   }
 
   async deleteLikeAlbumHandler(request, h) {
-    try {
-      const { id: credentialId } = request.auth.credentials;
-      const { id: albumId } = request.params;
+    const { id: userId } = request.auth.credentials;
+    const { id: albumId } = request.params;
 
-      await this._albumsService.getAlbumById(albumId);
-      const message = await this._service.deleteLike(credentialId, albumId);
+    await this._service.unlikeAlbum(userId, albumId);
 
-      return h.response({
-        status: 'success',
-        message,
-      }).code(200);
-    } catch (error) {
-      console.error('deleteLikeAlbumHandler error:', error);
-      throw error;
-    }
+    return h.response({
+      status: 'success',
+      message: 'Batal menyukai album',
+    }).code(200);
   }
 }
 

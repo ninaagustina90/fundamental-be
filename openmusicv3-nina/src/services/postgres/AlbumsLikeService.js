@@ -3,6 +3,7 @@ const { nanoid } = require('nanoid');
 const InvariantError = require('../../exceptions/invariantError');
 const NotFoundError = require('../../exceptions/notFoundError');
 const ClientError = require('../../exceptions/clientError');
+const AuthenticationError = require('../../exceptions/authenticationError');
 
 class AlbumLikeService {
   constructor(cacheService) {
@@ -10,80 +11,94 @@ class AlbumLikeService {
     this._cacheService = cacheService;
   }
 
-  async addLike(albumId, userId) {
-    const id = `like-${nanoid(16)}`;
+  async likeAlbum(albumId, userId) {
+    const checkAlbumQuery = {
+      text: 'SELECT id FROM albums WHERE id = $1',
+      values: [albumId],
+    };
 
+    const albumResult = await this._pool.query(checkAlbumQuery);
+    if (!albumResult.rowCount) {
+      throw new NotFoundError('Album tidak ditemukan');
+    }
+
+    const checkLikeQuery = {
+      text: 'SELECT * FROM user_album_likes WHERE user_id = $1 AND album_id = $2',
+      values: [userId, albumId],
+    };
+    const likeResult = await this._pool.query(checkLikeQuery);
+    if (likeResult.rowCount > 0) {
+      throw new InvariantError('Anda sudah menyukai album ini');
+    }
+
+    const addLikeQuery = {
+      text: 'INSERT INTO user_album_likes VALUES ($1, $2)',
+      values: [userId, albumId],
+    };
+    await this._pool.query(addLikeQuery);
+    
+    await this._cacheService.delete(`album_likes:${albumId}`);
+  }
+
+  async unlikeAlbum(albumId, userId) {
     const query = {
-      text: 'INSERT INTO album_likes VALUES ($1, $2, $3) RETURNING id',
-      values: [id, userId, albumId],
+      text: 'DELETE FROM user_album_likes WHERE user_id = $1 AND album_id = $2',
+      values: [userId, albumId],
     };
 
     const result = await this._pool.query(query);
-
-    if (!result.rows[0].id) {
-      throw new InvariantError('Gagal menyukai album');
+    if (result.rowCount === 0) {
+      throw new InvariantError('Like tidak ditemukan');
     }
 
-    await this._cacheService.delete(`likes:${albumId}`);
-    return result.rows[0].id;
+    await this._cacheService.delete(`album_likes:${albumId}`);
   }
 
-  async getLike(albumId) {
-    try {
-      const result = await this._cacheService.get(`likes:${albumId}`);
+  async getAlbumLikes(albumId) {
+    try { 
+      const result = await this._cacheService.get(`album_likes:${albumId}`);
+      const likes = parseInt(result, 10);
       return {
-        likes: JSON.parse(result),
-        cached: true,
-      };
+        likes,
+        isCaached: true,
+      }
     } catch (error) {
       const query = {
-        text: 'SELECT * FROM album_likes WHERE album_id = $1',
+        text: 'SELECT COUNT(*) FROM user_album_likes WHERE album_id = $1',
         values: [albumId],
       };
 
       const result = await this._pool.query(query);
+      const likes = parseInt(result.rows[0].count, 10);
 
-      if (!result.rowCount) {
-        throw new NotFoundError('Album tidak ditemukan');
-      }
+      await this._cacheService.set(`album_likes:${albumId}`, likes);
 
-      await this._cacheService.set(
-        `likes:${albumId}`,
-        JSON.stringify(result.rowCount),
-      );
-
-      return {
-        likes: result.rowCount,
-        cached: false,
+      return { 
+        likes,
+        isCached: false,
       };
     }
   }
 
-  async deleteLike(albumId, userId) {
+  async isUserLikedAlbum(userId, albumId) {
     const query = {
-      text: 'DELETE FROM album_likes WHERE album_id = $1 AND user_id = $2',
-      values: [albumId, userId],
+      text: 'SELECT * FROM user_album_likes WHERE user_id = $1 AND album_id = $2',
+      values: [userId, albumId],
     };
 
     const result = await this._pool.query(query);
-
-    if (!result.rowCount) {
-      throw new NotFoundError('Gagal batal menyukai album. Id tidak ditemukan');
-    }
-
-    await this._cacheService.delete(`likes:${albumId}`);
-  }
-
-  async verifyAlbumLiked(albumId, userId) {
+    return result.rowCount > 0;
+   }
+   
+   async verifyUser(userId) {
     const query = {
-      text: 'SELECT * FROM album_likes WHERE album_id = $1 AND user_id = $2',
-      values: [albumId, userId],
+      text: 'SELECT id FROM users WHERE id = $1',
+      values: [userId],
     };
 
     const result = await this._pool.query(query);
-
-    if (result.rowCount > 0) {
-      throw new ClientError('Anda sudah menyukai album ini');
+    if (!result.rows.length) {
+      throw new AuthenticationErrorr('Anda tidak berhak menyukai album ini');
     }
   }
 }

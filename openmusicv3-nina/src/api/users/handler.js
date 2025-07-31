@@ -41,20 +41,20 @@ class UsersHandler {
     }
   }
 
-  async getUsersByUsernameHandler(request, h) {
-    try {
-      const { username = '' } = request.query;
-      const users = await this._service.getUsersByUsername(username);
+  // async getUsersByUsernameHandler(request, h) {
+  //   try {
+  //     const { username = '' } = request.query;
+  //     const users = await this._service.getUsersByUsername(username);
 
-      return h.response({
-        status: 'success',
-        data: { users },
-      }).code(200);
-    } catch (error) {
-      console.error('getUsersByUsernameHandler error:', error);
-      throw error;
-    }
-  }
+  //     return h.response({
+  //       status: 'success',
+  //       data: { users },
+  //     }).code(200);
+  //   } catch (error) {
+  //     console.error('getUsersByUsernameHandler error:', error);
+  //     throw error;
+  //   }
+  // }
 }
 
 module.exports = UsersHandler;

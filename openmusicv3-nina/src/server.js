@@ -127,22 +127,24 @@ const init = async () => {
       options: {
         collaborationsService,
         playlistsService,
+        usersService,
         validator: CollaborationsValidator,
       },
     },
     {
       plugin: exportsApi,
       options: {
-        playlistsService,
         producerService: ProducerService,
+        playlistsService,
         validator: ExportsValidator,
       },
     },
     {
       plugin: uploads,
       options: {
-        service: storageService,
+        service: storageService, 
         validator: UploadsValidator,
+        albumsService,
       },
     },
     {

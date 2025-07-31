@@ -2,8 +2,8 @@ const autoBind = require('auto-bind').default; // ⛑️ pastikan ambil fungsi .
 const config = require('../../utils/config');
 
 class UploadsHandler {
-  constructor(storageService, albumsService, validator) {
-    this._storageService = storageService;
+  constructor(service, albumsService, validator) {
+    this._service = service;
     this._albumsService = albumsService;
     this._validator = validator;
 
@@ -18,7 +18,8 @@ class UploadsHandler {
       this._validator.validateImageHeaders(cover.hapi.headers);
 
       await this._albumsService.getAlbumById(albumId);
-      const filename = await this._storageService.writeFile(cover, cover.hapi);
+      const filename = await this._service.writeFile(cover, cover.hapi);
+      console.log(`File uploaded: ${filename}`); 
 
       const fileUrl = `http://${config.app.host}:${config.app.port}/upload/images/${filename}`;
       await this._albumsService.addCoverUrlAlbum(albumId, fileUrl);

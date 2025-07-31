@@ -2,7 +2,6 @@ const { Pool } = require('pg');
 const { nanoid } = require('nanoid');
 const bcrypt = require('bcrypt');
 const InvariantError = require('../../exceptions/invariantError');
-const NotFoundError = require('../../exceptions/notFoundError');
 const AuthenticationError = require('../../exceptions/authenticationError');
 
 class UsersService {
@@ -82,16 +81,16 @@ class UsersService {
     return id;
   }
 
-  async getUsersByUsername(username) {
-    const query = {
-      text: 'SELECT id, username, fullname FROM users WHERE username LIKE $1',
-      values: [`%${username}%`],
-    };
+  // async getUsersByUsername(username) {
+  //   const query = {
+  //     text: 'SELECT id, username, fullname FROM users WHERE username LIKE $1',
+  //     values: [`%${username}%`],
+  //   };
 
-    const { rows } = await this._pool.query(query);
+  //   const { rows } = await this._pool.query(query);
 
-    return rows;
-  }
+  //   return rows;
+  // }
 }
 
 module.exports = UsersService;

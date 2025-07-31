@@ -1,6 +1,12 @@
 const routes = (handler) => [
   // Playlist CRUD
   {
+    method: 'GET',
+    path: '/playlists',
+    handler: handler.getPlaylistsByUserIdHandler,
+    options: { auth: 'openmusicapp_jwt' },
+  },
+  {
     method: 'POST',
     path: '/playlists',
     handler: handler.postPlaylistHandler,
